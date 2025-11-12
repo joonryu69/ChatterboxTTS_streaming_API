@@ -83,7 +83,7 @@ This is the "advanced" request, similar to what you would have done *with* a `.j
 curl -X 'POST' \
   '[http://127.0.0.1:8000/generate-speech/](http://127.0.0.1:8000/generate-speech/)' \
   -H 'accept: application/json' \
-  -F 'audio_prompt_file=@/path/to/my_voice_prompt.wav' \
+  -F 'audio_prompt_file=moon.wav' \
   -F 'text=이것은 업로드된 WAV 파일을 프롬프트로 사용한 테스트입니다.' \
   -F 'language_id=ko' \
   -F 'temperature=0.7' \
@@ -91,7 +91,28 @@ curl -X 'POST' \
   --output speech_from_prompt.wav
 ```
 
-### Example 3: Python `requests` Client
+### Example 3: `curl` Request (Using .json file)
+
+```bash
+curl -X 'POST'   'http://127.0.0.1:8000/generate-speech/'   -H 'Content-Type: application/json'   -d '@request.json'   --output file_from_json.wav
+```
+
+```json
+{
+  "text": "이것은 지정된 파라미터를 사용한 요청입니다.",
+  "language_id": "ko",
+  "temperature": 0.7,
+  "repetition_penalty": 1.8,
+  "chunk_size": 100,
+  "exaggeration": 2.5,
+  "context_window": 150,
+  "fade_duration": 0.035,
+  "cfg_weight": 0.000001,
+}
+```
+
+
+### Example 4: Python `requests` Client
 
 Here is how you would call the API from another Python script.
 
