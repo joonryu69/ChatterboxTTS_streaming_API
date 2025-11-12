@@ -1,155 +1,159 @@
-# Chatterbox TTS Streaming
-Chatterbox is an open source TTS model. Licensed under MIT, Chatterbox has been benchmarked against leading closed-source systems like ElevenLabs, and is consistently preferred in side-by-side evaluations.
-Whether you're working on memes, videos, games, or AI agents, Chatterbox brings your content to life. It's also the first open source TTS model to support **emotion exaggeration control**, a powerful feature that makes your voices stand out. This fork adds a streaming implementation that achieves a realtime factor of 0.499 (target < 1) on a 4090 gpu and a latency to first chunk of around 0.472s
 
-# Key Details
-- SoTA zeroshot TTS
-- 0.5B Llama backbone
-- Unique exaggeration/intensity control
-- Ultra-stable with alignment-informed inference
-- Trained on 0.5M hours of cleaned data
-- Watermarked outputs
-- Easy voice conversion script
-- **Real-time streaming generation**
-- [Outperforms ElevenLabs]
+# Chatterbox-TTS FastAPI Server
 
-# Tips
-- **General Use (TTS and Voice Agents):**
-- The default settings (`exaggeration=0.5`, `cfg_weight=0.5`) work well for most prompts.
-- If the reference speaker has a fast speaking style, lowering `cfg_weight` to around `0.3` can improve pacing.
-- **Expressive or Dramatic Speech:**
-- Try lower `cfg_weight` values (e.g. `~0.3`) and increase `exaggeration` to around `0.7` or higher.
-- Higher `exaggeration` tends to speed up speech; reducing `cfg_weight` helps compensate with slower, more deliberate pacing.
+This project wraps a local, modified version of `chatterbox-tts` (specifically `ChatterboxMultilingualTTS`) in a high-performance FastAPI server.
 
-# Installation
-```
-python3.10 -m venv .venv
-source .venv/bin/activate
-pip install chatterbox-streaming
-```
+It exposes a simple API endpoint to generate speech from text, with options to provide an audio file as a voice prompt.
 
-## Build for development
-```
-git clone https://github.com/davidbrowne17/chatterbox-streaming.git
+## Features
+
+* **FastAPI:** High-performance, asynchronous API framework.
+* **Multilingual TTS:** Utilizes `ChatterboxMultilingualTTS`.
+* **Dynamic Voice Prompting:** Supports optionally uploading a `.wav` file in the request to be used as the audio prompt.
+* **Configurable:** All `generate_stream` parameters (temperature, repetition_penalty, etc.) are exposed via the API.
+* **Streaming-Ready Core:** The underlying code uses `generate_stream`, although this endpoint collects all chunks before returning.
+
+## Setup and Installation
+
+This guide assumes you have the `chatterbox-tts` *source code* locally and are installing it in editable mode.
+
+**Prerequisites:**
+* Python 3.11.13
+* PyTorch (with CUDA, if available)
+* The `chatterbox-tts` source code downloaded to a known path (e.g., `/path/to/your/chatterbox-tts-modified`).
+
+### 1. Create a Virtual Environment
+
+First, create a separate directory for your API server, set up a virtual environment, and activate it.
+
+```bash
+mkdir chatterbox_api
+cd chatterbox_api
+python3 -m venv venv
+source venv/bin/activate
+````
+
+### 2\. Install Dependencies
+
+Install FastAPI, Uvicorn, and other Python necessities.
+
+```bash
 pip install -e .
 ```
 
-# Usage
+## Running the Server
 
-## Basic TTS Generation
-```python
-import torchaudio as ta
-from chatterbox.tts import ChatterboxTTS
+With your virtual environment still active, run the Uvicorn server from your `chatterbox_api` directory (where your `main.py` is located).
 
-model = ChatterboxTTS.from_pretrained(device="cuda")
-text = "Ezreal and Jinx teamed up with Ahri, Yasuo, and Teemo to take down the enemy's Nexus in an epic late-game pentakill."
-wav = model.generate(text)
-ta.save("test-1.wav", wav, model.sr)
-
-# If you want to synthesize with a different voice, specify the audio prompt
-AUDIO_PROMPT_PATH = "YOUR_FILE.wav"
-wav = model.generate(text, audio_prompt_path=AUDIO_PROMPT_PATH)
-ta.save("test-2.wav", wav, model.sr)
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-## Streaming TTS Generation
-For real-time applications where you want to start playing audio as soon as it's available:
+  * `main`: The name of your Python file (`main.py`).
+  * `app`: The name of the `FastAPI()` object inside `main.py`.
+  * `--host 0.0.0.0`: Binds to all available network interfaces (essential for remote/network access).
+  * `--port 8000`: The port to listen on.
 
-```python
-import torchaudio as ta
-import torch
-from chatterbox.tts import ChatterboxTTS
+Once running, you can access the automatic API documentation in your browser at:
+**`http://127.0.0.1:8000/docs`**
 
-model = ChatterboxTTS.from_pretrained(device="cuda")
-text = "Welcome to the world of streaming text-to-speech! This audio will be generated and played in real-time chunks."
+## How to Use: Sending API Requests
 
-# Basic streaming
-audio_chunks = []
-for audio_chunk, metrics in model.generate_stream(text):
-    audio_chunks.append(audio_chunk)
-    # You can play audio_chunk immediately here for real-time playback
-    print(f"Generated chunk {metrics.chunk_count}, RTF: {metrics.rtf:.3f}" if metrics.rtf else f"Chunk {metrics.chunk_count}")
+The API has one main endpoint: `POST /generate-speech/`.
 
-# Combine all chunks into final audio
-final_audio = torch.cat(audio_chunks, dim=-1)
-ta.save("streaming_output.wav", final_audio, model.sr)
+**Important:** This API uses `multipart/form-data`, **not** `application/json`. This is necessary to support optional file uploads. Because of this, you **cannot send a `.json` file**. Instead, you must send each parameter as a separate `-F` (form) field in your `curl` request.
+
+### Example 1: `curl` Request (Simple, No Audio Prompt)
+
+This is the most basic request, similar to what you would have done *without* a `.json` file. It only sends the required `text` field and relies on the default values for all other parameters.
+
+```bash
+curl -X 'POST' \
+  '[http://127.0.0.1:8000/generate-speech/](http://127.0.0.1:8000/generate-speech/)' \
+  -H 'accept: application/json' \
+  -F 'text=이것은 오디오 프롬프트가 없는 기본 테스트입니다.' \
+  --output simple_speech.wav
 ```
 
-## Streaming with Voice Cloning
-```python
-import torchaudio as ta
-import torch
-from chatterbox.tts import ChatterboxTTS
+### Example 2: `curl` Request (With Uploaded Audio Prompt & Parameters)
 
-model = ChatterboxTTS.from_pretrained(device="cuda")
-text = "This streaming synthesis will use a custom voice from the reference audio file."
-AUDIO_PROMPT_PATH = "reference_voice.wav"
+This is the "advanced" request, similar to what you would have done *with* a `.json` file. Here, you provide a local `.wav` file for the `audio_prompt_file` field and override other parameters like `temperature`.
 
-audio_chunks = []
-for audio_chunk, metrics in model.generate_stream(
-    text, 
-    audio_prompt_path=AUDIO_PROMPT_PATH,
-    exaggeration=0.7,
-    cfg_weight=0.3,
-    chunk_size=25  # Smaller chunks for lower latency
-):
-    audio_chunks.append(audio_chunk)
-    
-    # Real-time metrics available
-    if metrics.latency_to_first_chunk:
-        print(f"First chunk latency: {metrics.latency_to_first_chunk:.3f}s")
-
-# Save the complete streaming output
-final_audio = torch.cat(audio_chunks, dim=-1)
-ta.save("streaming_voice_clone.wav", final_audio, model.sr)
+```bash
+curl -X 'POST' \
+  '[http://127.0.0.1:8000/generate-speech/](http://127.0.0.1:8000/generate-speech/)' \
+  -H 'accept: application/json' \
+  -F 'audio_prompt_file=@/path/to/my_voice_prompt.wav' \
+  -F 'text=이것은 업로드된 WAV 파일을 프롬프트로 사용한 테스트입니다.' \
+  -F 'language_id=ko' \
+  -F 'temperature=0.7' \
+  -F 'repetition_penalty=1.8' \
+  --output speech_from_prompt.wav
 ```
 
-## Streaming Parameters
-- `audio_prompt_path`: Reference audio path for voice cloning
-- `chunk_size`: Number of speech tokens per chunk (default: 50). Smaller values = lower latency but more overhead
-- `print_metrics`: Enable automatic printing of latency and RTF metrics (default: True)
-- `exaggeration`: Emotion intensity control (0.0-1.0+)
-- `cfg_weight`: Classifier-free guidance weight (0.0-1.0)
-- `temperature`: Sampling randomness (0.1-1.0)
+### Example 3: Python `requests` Client
 
-See `example_tts_stream.py` for more examples.
+Here is how you would call the API from another Python script.
 
-## Lora Fine-tuning
-To fine-tune Chatterbox all you need are some wav audio files with the speaker voice you want to train, just the raw wavs. Place them in a folder called audio_data and run lora.py. You can configure the exact training params such as batch size, number of epochs and learning rate by modifying the values at the top of lora.py. You will need a CUDA gpu with at least 18gb of vram depending on your dataset size and training params. You can monitor the training metrics via the dynamic png created called training_metrics. This contains various graphs to help you track the training progress. If you want to try a checkpoint you can use the loadandmergecheckpoint.py (make sure to set the same R and Alpha values as you used in the training)
+```python
+import requests
 
-## GRPO Fine-tuning
-Just like the lora fine-tuning for Chatterbox all you need are some wav audio files with the speaker voice you want to train, just the raw wavs. Place them in a folder called audio_data and run grpo.py. You can configure the exact training params such as batch size, number of epochs and learning rate by modifying the values at the top of grpo.py. You will need a CUDA gpu with at least 12gb of vram depending on your dataset size and training params. You can monitor the training metrics via the dynamic png created called grpo_training_metrics. This contains various graphs to help you track the training progress.
+# 1. API Endpoint
+url = "[http://127.0.0.1:8000/generate-speech/](http://127.0.0.1:8000/generate-speech/)"
 
-## Example metrics
-Here are the example metrics for streaming latency on a 4090 using Linux
-- Latency to first chunk: 0.472s
-- Received chunk 1, shape: torch.Size([1, 24000]), duration: 1.000s
-- Audio playback started!
-- Received chunk 2, shape: torch.Size([1, 24000]), duration: 1.000s
-- Received chunk 3, shape: torch.Size([1, 24000]), duration: 1.000s
-- Received chunk 4, shape: torch.Size([1, 24000]), duration: 1.000s
-- Received chunk 5, shape: torch.Size([1, 24000]), duration: 1.000s
-- Received chunk 6, shape: torch.Size([1, 20160]), duration: 0.840s
-- Total generation time: 2.915s
-- Total audio duration: 5.840s
-- RTF (Real-Time Factor): 0.499 (target < 1)
-- Total chunks yielded: 6
+# 2. Form data (text fields)
+form_data = {
+    "text": "이것은 파이썬 requests 라이브러리로 보낸 요청입니다.",
+    "language_id": "ko",
+    "temperature": 0.5
+}
 
-# Acknowledgements
-- [Cosyvoice](https://github.com/FunAudioLLM/CosyVoice)
-- [Real-Time-Voice-Cloning](https://github.com/CorentinJ/Real-Time-Voice-Cloning)
-- [HiFT-GAN](https://github.com/yl4579/HiFTNet)
-- [Llama 3](https://github.com/meta-llama/llama3)
-- [S3Tokenizer](https://github.com/xingchensong/S3Tokenizer)
+# 3. File data (optional)
+# Provide the path to your audio prompt
+file_path = "/path/to/my_voice_prompt.wav"
 
-# Built-in PerTh Watermarking for Responsible AI
-Every audio file generated by Chatterbox includes [Resemble AI's Perth (Perceptual Threshold) Watermarker](https://github.com/resemble-ai/perth) - imperceptible neural watermarks that survive MP3 compression, audio editing, and common manipulations while maintaining nearly 100% detection accuracy.
+try:
+    with open(file_path, 'rb') as f:
+        files = {
+            "audio_prompt_file": (f.name, f, "audio/wav")
+        }
 
-# Disclaimer
-Don't use this model to do bad things. Prompts are sourced from freely available data on the internet.
+        # Send the POST request with both data and files
+        response = requests.post(url, data=form_data, files=files)
 
-## Streaming Implementation Author
-David Browne
+    # To send *without* a file, just omit the 'files' argument:
+    # response = requests.post(url, data=form_data)
+        
+    if response.status_code == 200:
+        # Save the returned audio file
+        with open("python_output.wav", 'wb') as out_f:
+            out_f.write(response.content)
+        print("Success! Audio saved to python_output.wav")
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.json())
 
-## Support me
-Support this project on Ko-fi: https://ko-fi.com/davidbrowne17
+except Exception as e:
+    print(f"An error occurred: {e}")
+```
+
+### API Parameters
+
+All parameters are sent as `multipart/form-data` fields.
+
+| Field | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `text` | `string` | **Yes** | N/A | The text to be synthesized. |
+| `audio_prompt_file` | `file` | No | `None` | A `.wav` file to be used as the voice prompt. |
+| `language_id` | `string` | No | `'ko'` | Language ID for the model (e.g., 'ko', 'en'). |
+| `temperature` | `float` | No | `0.3` | Controls generation randomness. |
+| `repetition_penalty` | `float` | No | `1.4` | Penalty for repeating sequences. |
+| `chunk_size` | `int` | No | `120` | Size of audio chunks to process. |
+| `exaggeration` | `float` | No | `2.5` | |
+| `context_window` | `int` | No | `150` | |
+| `fade_duration` | `float` | No | `0.035` | |
+| `cfg_weight` | `float` | No | `0.000001` | |
+| `audio_prompt_filename` | `string` | No | `None` | Path to a prompt file *already on the server*. (Use `audio_prompt_file` instead for uploads). |
+
+```
+```
