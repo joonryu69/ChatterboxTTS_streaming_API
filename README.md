@@ -61,7 +61,6 @@ Once running, you can access the automatic API documentation in your browser at:
 
 The API has one main endpoint: `POST /generate-speech/`.
 
-**Important:** This API uses `multipart/form-data`, **not** `application/json`. This is necessary to support optional file uploads. Because of this, you **cannot send a `.json` file**. Instead, you must send each parameter as a separate `-F` (form) field in your `curl` request.
 
 ### Example 1: `curl` Request (Simple, No Audio Prompt)
 
@@ -69,29 +68,16 @@ This is the most basic request, similar to what you would have done *without* a 
 
 ```bash
 curl -X 'POST' \
-  '[http://127.0.0.1:8000/generate-speech/](http://127.0.0.1:8000/generate-speech/)' \
-  -H 'accept: application/json' \
-  -F 'text=이것은 오디오 프롬프트가 없는 기본 테스트입니다.' \
-  --output simple_speech.wav
+  'http://127.0.0.1:8000/generate-speech/' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "text": "이것은 curl을 사용한 API 요청입니다.",
+    "language_id": "ko"
+  }' \
+  --output output.wav
 ```
 
-### Example 2: `curl` Request (With Uploaded Audio Prompt & Parameters)
-
-This is the "advanced" request, similar to what you would have done *with* a `.json` file. Here, you provide a local `.wav` file for the `audio_prompt_file` field and override other parameters like `temperature`.
-
-```bash
-curl -X 'POST' \
-  '[http://127.0.0.1:8000/generate-speech/](http://127.0.0.1:8000/generate-speech/)' \
-  -H 'accept: application/json' \
-  -F 'audio_prompt_file=moon.wav' \
-  -F 'text=이것은 업로드된 WAV 파일을 프롬프트로 사용한 테스트입니다.' \
-  -F 'language_id=ko' \
-  -F 'temperature=0.7' \
-  -F 'repetition_penalty=1.8' \
-  --output speech_from_prompt.wav
-```
-
-### Example 3: `curl` Request (Using .json file)
+### Example 2: `curl` Request (Using .json file)
 
 ```bash
 curl -X 'POST'   'http://127.0.0.1:8000/generate-speech/'   -H 'Content-Type: application/json'   -d '@request.json'   --output file_from_json.wav
@@ -109,53 +95,6 @@ curl -X 'POST'   'http://127.0.0.1:8000/generate-speech/'   -H 'Content-Type: ap
   "fade_duration": 0.035,
   "cfg_weight": 0.000001,
 }
-```
-
-
-### Example 4: Python `requests` Client
-
-Here is how you would call the API from another Python script.
-
-```python
-import requests
-
-# 1. API Endpoint
-url = "[http://127.0.0.1:8000/generate-speech/](http://127.0.0.1:8000/generate-speech/)"
-
-# 2. Form data (text fields)
-form_data = {
-    "text": "이것은 파이썬 requests 라이브러리로 보낸 요청입니다.",
-    "language_id": "ko",
-    "temperature": 0.5
-}
-
-# 3. File data (optional)
-# Provide the path to your audio prompt
-file_path = "/path/to/my_voice_prompt.wav"
-
-try:
-    with open(file_path, 'rb') as f:
-        files = {
-            "audio_prompt_file": (f.name, f, "audio/wav")
-        }
-
-        # Send the POST request with both data and files
-        response = requests.post(url, data=form_data, files=files)
-
-    # To send *without* a file, just omit the 'files' argument:
-    # response = requests.post(url, data=form_data)
-        
-    if response.status_code == 200:
-        # Save the returned audio file
-        with open("python_output.wav", 'wb') as out_f:
-            out_f.write(response.content)
-        print("Success! Audio saved to python_output.wav")
-    else:
-        print(f"Error: {response.status_code}")
-        print(response.json())
-
-except Exception as e:
-    print(f"An error occurred: {e}")
 ```
 
 ### API Parameters
