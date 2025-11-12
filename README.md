@@ -153,7 +153,6 @@ All parameters are sent as `multipart/form-data` fields.
 | `context_window` | `int` | No | `150` | |
 | `fade_duration` | `float` | No | `0.035` | |
 | `cfg_weight` | `float` | No | `0.000001` | |
-| `audio_prompt_filename` | `string` | No | `None` | Path to a prompt file *already on the server*. (Use `audio_prompt_file` instead for uploads). |
 
 ```
 ```
