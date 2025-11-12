@@ -104,7 +104,7 @@ All parameters are sent as `multipart/form-data` fields.
 | Field | Type | Required | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | `text` | `string` | **Yes** | N/A | The text to be synthesized. |
-| `audio_prompt_file` | `file` | No | `None` | A `.wav` file to be used as the voice prompt. |
+| `audio_prompt_filename` | `file` | No | `None` | A `.wav` file to be used as the voice prompt. |
 | `language_id` | `string` | No | `'ko'` | Language ID for the model (e.g., 'ko', 'en'). |
 | `temperature` | `float` | No | `0.3` | Controls generation randomness. |
 | `repetition_penalty` | `float` | No | `1.4` | Penalty for repeating sequences. |
